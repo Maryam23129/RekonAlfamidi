@@ -82,12 +82,11 @@ if uploaded_tiket_files and uploaded_invoice and uploaded_summary_files and uplo
     invoice_df = load_excel(uploaded_invoice)
     invoice_df['HARGA'] = pd.to_numeric(invoice_df['HARGA'], errors='coerce')
     filtered_invoice = invoice_df[invoice_df['STATUS'].str.lower() == 'dibayar']
-    invoice_by_pelabuhan = (
-        filtered_invoice.groupby('KEBERANGKATAN')['HARGA']
-        .sum()
-        .reset_index()
-    )
+    invoice_by_pelabuhan = filtered_invoice.groupby('KEBERANGKATAN')['HARGA'].sum().reset_index()
     invoice_by_pelabuhan['KEBERANGKATAN'] = invoice_by_pelabuhan['KEBERANGKATAN'].str.lower().str.replace('pelabuhan', '').str.strip()
+
+    pengurangan_total = ""
+    penambahan_dict = {}
 
     match_range = re.search(r'(\d{4}-\d{2}-\d{2})\s*s[_\-]d\s*(\d{4}-\d{2}-\d{2})', uploaded_invoice.name)
     tanggal_transaksi_str = ""
@@ -100,26 +99,36 @@ if uploaded_tiket_files and uploaded_invoice and uploaded_summary_files and uplo
             tanggal_akhir_str = match.group(1)
             tanggal_transaksi_str = pd.to_datetime(tanggal_akhir_str).strftime('%d-%m-%Y')
 
-    # Ambil nilai penambahan dari tanggal awal invoice jam 00:00–08:00
-    penambahan_dict = {}
+    if 'tanggal_akhir_str' in locals():
+        tanggal_akhir = pd.to_datetime(tanggal_akhir_str)
+        target_date = tanggal_akhir + pd.Timedelta(days=1)
+        for summary_file in uploaded_summary_files:
+            if target_date.strftime('%Y-%m-%d') in summary_file.name:
+                summary_df = load_excel(summary_file)
+                summary_df["CETAK BOARDING PASS"] = pd.to_datetime(summary_df["CETAK BOARDING PASS"], errors='coerce')
+                summary_df["TARIF"] = pd.to_numeric(summary_df["TARIF"], errors='coerce')
+                summary_filtered = summary_df[
+                    (summary_df["CETAK BOARDING PASS"].dt.date == target_date.date()) &
+                    (summary_df["CETAK BOARDING PASS"].dt.time >= pd.to_datetime("00:00:00").time()) &
+                    (summary_df["CETAK BOARDING PASS"].dt.time <= pd.to_datetime("08:00:00").time())
+                ]
+                pengurangan_total = summary_filtered["TARIF"].sum() if not summary_filtered.empty else ""
+
     if 'tanggal_awal_str' in locals():
         tanggal_awal = pd.to_datetime(tanggal_awal_str)
         for summary_file in uploaded_summary_files:
             if tanggal_awal.strftime('%Y-%m-%d') in summary_file.name:
-                summary_df_pen = load_excel(summary_file)
-                summary_df_pen["CETAK BOARDING PASS"] = pd.to_datetime(summary_df_pen["CETAK BOARDING PASS"], errors='coerce')
-                summary_df_pen["TARIF"] = pd.to_numeric(summary_df_pen["TARIF"], errors='coerce')
-                summary_df_pen["ASAL"] = summary_df_pen["ASAL"].astype(str).str.lower()
-
-                summary_filtered_pen = summary_df_pen[
-                    (summary_df_pen["CETAK BOARDING PASS"].dt.date == tanggal_awal.date()) &
-                    (summary_df_pen["CETAK BOARDING PASS"].dt.time >= pd.to_datetime("00:00:00").time()) &
-                    (summary_df_pen["CETAK BOARDING PASS"].dt.time <= pd.to_datetime("08:00:00").time())
+                df_pen = load_excel(summary_file)
+                df_pen["CETAK BOARDING PASS"] = pd.to_datetime(df_pen["CETAK BOARDING PASS"], errors='coerce')
+                df_pen["TARIF"] = pd.to_numeric(df_pen["TARIF"], errors='coerce')
+                df_pen["ASAL"] = df_pen["ASAL"].astype(str).str.lower()
+                filtered = df_pen[
+                    (df_pen["CETAK BOARDING PASS"].dt.date == tanggal_awal.date()) &
+                    (df_pen["CETAK BOARDING PASS"].dt.time >= pd.to_datetime("00:00:00").time()) &
+                    (df_pen["CETAK BOARDING PASS"].dt.time <= pd.to_datetime("08:00:00").time())
                 ]
-
-                if not summary_filtered_pen.empty:
-                    grouped = summary_filtered_pen.groupby("ASAL")["TARIF"].sum()
-                    penambahan_dict = grouped.to_dict()
+                if not filtered.empty:
+                    penambahan_dict = filtered.groupby("ASAL")["TARIF"].sum().to_dict()
                 break
 
     rekening_df = load_excel(uploaded_rekening)
@@ -128,10 +137,7 @@ if uploaded_tiket_files and uploaded_invoice and uploaded_summary_files and uplo
     total_rekening_midi = rekening_detail_df['Credit'].sum()
 
     pelabuhan_list = ["Merak", "Bakauheni", "Ketapang", "Gilimanuk", "Ciwandan", "Panjang"]
-    invoice_list = [
-        invoice_by_pelabuhan[invoice_by_pelabuhan['KEBERANGKATAN'] == pel.lower()]['HARGA'].sum()
-        for pel in pelabuhan_list
-    ]
+    invoice_list = [invoice_by_pelabuhan[invoice_by_pelabuhan['KEBERANGKATAN'] == pel.lower()]['HARGA'].sum() for pel in pelabuhan_list]
     uang_masuk_list = [total_rekening_midi] + [0] * (len(pelabuhan_list) - 1)
     selisih_list = [inv - uang for inv, uang in zip(invoice_list, uang_masuk_list)]
 
@@ -139,34 +145,23 @@ if uploaded_tiket_files and uploaded_invoice and uploaded_summary_files and uplo
         "No": list(range(1, len(pelabuhan_list) + 1)),
         "Tanggal Transaksi": [tanggal_transaksi_str] * len(pelabuhan_list),
         "Pelabuhan Asal": pelabuhan_list,
-        "Nominal Tiket Terjual": [
-            next((b['Pendapatan'] for b in b2b_list if b['Pelabuhan'].lower() == pel.lower()), 0)
-            for pel in pelabuhan_list
-        ],
+        "Nominal Tiket Terjual": [next((b['Pendapatan'] for b in b2b_list if b['Pelabuhan'].lower() == pel.lower()), 0) for pel in pelabuhan_list],
         "Invoice": invoice_list,
         "Uang Masuk": uang_masuk_list,
         "Selisih": selisih_list,
-        "Pengurangan": [
-            pengurangan_total if i == 0 and pengurangan_total else ""
-            for i in range(len(pelabuhan_list))
-        ],
+        "Pengurangan": [pengurangan_total if i == 0 and pengurangan_total else "" for i in range(len(pelabuhan_list))],
         "Penambahan": [penambahan_dict.get(pel.lower(), "") for pel in pelabuhan_list],
         "Naik Turun Golongan": [""] * len(pelabuhan_list),
         "NET": [""] * len(pelabuhan_list)
     })
 
     total_row = {
-        "No": "",
-        "Tanggal Transaksi": "",
-        "Pelabuhan Asal": "TOTAL",
+        "No": "", "Tanggal Transaksi": "", "Pelabuhan Asal": "TOTAL",
         "Nominal Tiket Terjual": df["Nominal Tiket Terjual"].sum(),
         "Invoice": df["Invoice"].sum(),
         "Uang Masuk": df["Uang Masuk"].sum(),
         "Selisih": df["Invoice"].sum() - df["Uang Masuk"].sum(),
-        "Pengurangan": "",
-        "Penambahan": "",
-        "Naik Turun Golongan": "",
-        "NET": ""
+        "Pengurangan": "", "Penambahan": "", "Naik Turun Golongan": "", "NET": ""
     }
 
     df = pd.concat([df, pd.DataFrame([total_row])], ignore_index=True)
@@ -177,9 +172,7 @@ if uploaded_tiket_files and uploaded_invoice and uploaded_summary_files and uplo
     st.dataframe(df_pelabuhan_display, use_container_width=True)
 
     st.subheader("📄 Tabel Rekapitulasi Total Keseluruhan")
-    df_total = df[df["Pelabuhan Asal"] == "TOTAL"].drop(
-        columns=["Pelabuhan Asal", "No", "Nominal Tiket Terjual", "Pengurangan", "Penambahan", "Naik Turun Golongan", "NET"]
-    )
+    df_total = df[df["Pelabuhan Asal"] == "TOTAL"].drop(columns=["Pelabuhan Asal", "No", "Nominal Tiket Terjual", "Pengurangan", "Penambahan", "Naik Turun Golongan", "NET"])
     st.dataframe(df_total, use_container_width=True)
 
     output_excel = to_excel(df)
