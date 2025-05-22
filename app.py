@@ -89,6 +89,7 @@ if uploaded_tiket_files and uploaded_invoice and uploaded_summary and uploaded_r
 
     match = re.search(r's_d[_\s](\d{4}-\d{2}-\d{2})', uploaded_invoice.name)
     pengurangan_total = ""
+    tanggal_akhir_str = ""
     if match:
         tanggal_akhir_str = match.group(1)
         tanggal_akhir = pd.to_datetime(tanggal_akhir_str)
@@ -103,7 +104,8 @@ if uploaded_tiket_files and uploaded_invoice and uploaded_summary and uploaded_r
             (summary_df["CETAK BOARDING PASS"].dt.time >= pd.to_datetime("00:00:00").time()) &
             (summary_df["CETAK BOARDING PASS"].dt.time <= pd.to_datetime("08:00:00").time())
         ]
-        pengurangan_total = summary_filtered["TARIF"].sum()
+        total_pengurangan = summary_filtered["TARIF"].sum()
+        pengurangan_total = total_pengurangan if total_pengurangan > 0 else ""
 
     rekening_df = load_excel(uploaded_rekening)
     rekening_detail_df = extract_total_rekening(rekening_df)
@@ -120,7 +122,7 @@ if uploaded_tiket_files and uploaded_invoice and uploaded_summary and uploaded_r
 
     df = pd.DataFrame({
         "No": list(range(1, len(pelabuhan_list) + 1)),
-        "Tanggal Transaksi": [f"{tanggal_akhir_str}"] * len(pelabuhan_list),
+        "Tanggal Transaksi": [tanggal_akhir_str] * len(pelabuhan_list),
         "Pelabuhan Asal": pelabuhan_list,
         "Nominal Tiket Terjual": [
             next((b['Pendapatan'] for b in b2b_list if b['Pelabuhan'].lower() == pel.lower()), 0)
@@ -129,7 +131,10 @@ if uploaded_tiket_files and uploaded_invoice and uploaded_summary and uploaded_r
         "Invoice": invoice_list,
         "Uang Masuk": uang_masuk_list,
         "Selisih": selisih_list,
-        "Pengurangan": [pengurangan_total if i == 0 and pengurangan_total > 0 else "" for i in range(len(pelabuhan_list))],
+        "Pengurangan": [
+            pengurangan_total if i == 0 and pengurangan_total else "" 
+            for i in range(len(pelabuhan_list))
+        ],
         "Penambahan": [""] * len(pelabuhan_list),
         "Naik Turun Golongan": [""] * len(pelabuhan_list),
         "NET": [""] * len(pelabuhan_list)
