@@ -100,13 +100,14 @@ if tiket_files and invoice_file and rekening_file and summary_files:
                     for pel in ["merak", "bakauheni", "ketapang", "gilimanuk", "ciwandan", "panjang"]:
                         sum_pel = df[df["ASAL"] == pel]
                         inv_pel = invoice_df[invoice_df["KEBERANGKATAN"].str.lower().str.contains(pel)]
+
                         ringkasan = []
-                        common = set(sum_pel["NOMOR INVOICE"]).intersection(set(inv_pel["NOMOR INVOICE"]))
-                        for no in common:
-                            t1 = sum_pel[sum_pel["NOMOR INVOICE"] == no]["TARIF"].sum()
-                            t2 = inv_pel[inv_pel["NOMOR INVOICE"] == no]["HARGA"].sum()
+                        common_invoices = set(sum_pel["NOMOR INVOICE"]).intersection(set(inv_pel["NOMOR INVOICE"]))
+                        for noinv in common_invoices:
+                            t1 = sum_pel[sum_pel["NOMOR INVOICE"] == noinv]["TARIF"].sum()
+                            t2 = inv_pel[inv_pel["NOMOR INVOICE"] == noinv]["HARGA"].sum()
                             if t1 != t2:
-                                ringkasan.append(f"{no}: S={int(t1)}, I={int(t2)}")
+                                ringkasan.append(f"{noinv}: S={int(t1)}, I={int(t2)}")
                         if ringkasan:
                             naik_turun_dict[pel] = "; ".join(ringkasan)
                 break
@@ -144,7 +145,9 @@ if tiket_files and invoice_file and rekening_file and summary_files:
     st.dataframe(df[df["Pelabuhan Asal"] != "TOTAL"].drop(columns=["Invoice", "Uang Masuk", "Selisih"]), use_container_width=True)
 
     st.subheader("📄 Rekap Total")
-    st.dataframe(df[df["Pelabuhan Asal"] == "TOTAL"].drop(columns=["Pelabuhan Asal", "No", "Nominal Tiket Terjual", "Pengurangan", "Penambahan", "Naik Turun Golongan", "NET"]), use_container_width=True)
+    st.dataframe(df[df["Pelabuhan Asal"] == "TOTAL"].drop(columns=[
+        "Pelabuhan Asal", "No", "Nominal Tiket Terjual", "Pengurangan", "Penambahan", "Naik Turun Golongan", "NET"
+    ]), use_container_width=True)
 
     st.download_button("📥 Download Excel", to_excel(df), file_name="rekapitulasi.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
