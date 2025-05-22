@@ -87,15 +87,23 @@ if uploaded_tiket_files and uploaded_invoice and uploaded_summary and uploaded_r
     )
     invoice_by_pelabuhan['KEBERANGKATAN'] = invoice_by_pelabuhan['KEBERANGKATAN'].str.lower().str.replace('pelabuhan', '').str.strip()
 
-    match = re.search(r'(\d{4}-\d{2}-\d{2})\s*s[\-_]d\s*(\d{4}-\d{2}-\d{2})', uploaded_invoice.name)
+    match = re.search(r's_d[_\s](\d{4}-\d{2}-\d{2})', uploaded_invoice.name)
+    pengurangan_total = ""
     if match:
-        tanggal_awal_str, tanggal_akhir_str = match.groups()
-        tanggal_transaksi = f"{pd.to_datetime(tanggal_awal_str).strftime('%d-%m-%Y')} s.d {pd.to_datetime(tanggal_akhir_str).strftime('%d-%m-%Y')}"
-    else:
-        tanggal_transaksi = "Tanggal tidak tersedia"
+        tanggal_akhir_str = match.group(1)
+        tanggal_akhir = pd.to_datetime(tanggal_akhir_str)
+        target_date = tanggal_akhir + pd.Timedelta(days=1)
 
-    summary_df = load_excel(uploaded_summary)
-    _ = extract_total_summary(summary_df)
+        summary_df = load_excel(uploaded_summary)
+        summary_df["CETAK BOARDING PASS"] = pd.to_datetime(summary_df["CETAK BOARDING PASS"], errors='coerce')
+        summary_df["TARIF"] = pd.to_numeric(summary_df["TARIF"], errors='coerce')
+
+        summary_filtered = summary_df[
+            (summary_df["CETAK BOARDING PASS"].dt.date == target_date.date()) &
+            (summary_df["CETAK BOARDING PASS"].dt.time >= pd.to_datetime("00:00:00").time()) &
+            (summary_df["CETAK BOARDING PASS"].dt.time <= pd.to_datetime("08:00:00").time())
+        ]
+        pengurangan_total = summary_filtered["TARIF"].sum()
 
     rekening_df = load_excel(uploaded_rekening)
     rekening_detail_df = extract_total_rekening(rekening_df)
@@ -112,7 +120,7 @@ if uploaded_tiket_files and uploaded_invoice and uploaded_summary and uploaded_r
 
     df = pd.DataFrame({
         "No": list(range(1, len(pelabuhan_list) + 1)),
-        "Tanggal Transaksi": [tanggal_transaksi] * len(pelabuhan_list),
+        "Tanggal Transaksi": [f"{tanggal_akhir_str}"] * len(pelabuhan_list),
         "Pelabuhan Asal": pelabuhan_list,
         "Nominal Tiket Terjual": [
             next((b['Pendapatan'] for b in b2b_list if b['Pelabuhan'].lower() == pel.lower()), 0)
@@ -121,9 +129,9 @@ if uploaded_tiket_files and uploaded_invoice and uploaded_summary and uploaded_r
         "Invoice": invoice_list,
         "Uang Masuk": uang_masuk_list,
         "Selisih": selisih_list,
-        "Pengurangan": ["Belum Diisi"] * len(pelabuhan_list),
-        "Penambahan": ["Belum Diisi"] * len(pelabuhan_list),
-        "Naik Turun Golongan": ["Belum Diisi"] * len(pelabuhan_list),
+        "Pengurangan": [pengurangan_total if i == 0 and pengurangan_total > 0 else "" for i in range(len(pelabuhan_list))],
+        "Penambahan": [""] * len(pelabuhan_list),
+        "Naik Turun Golongan": [""] * len(pelabuhan_list),
         "NET": [""] * len(pelabuhan_list)
     })
 
@@ -140,33 +148,16 @@ if uploaded_tiket_files and uploaded_invoice and uploaded_summary and uploaded_r
         "Naik Turun Golongan": "",
         "NET": ""
     }
+
     df = pd.concat([df, pd.DataFrame([total_row])], ignore_index=True)
 
-    st.success("✅ Rekonsiliasi selesai! Tabel hasil berhasil dibuat.")
-
-    formatted_df = df.copy()
-    for col in ["Nominal Tiket Terjual", "Invoice", "Uang Masuk", "Selisih"]:
-        formatted_df[col] = formatted_df[col].apply(lambda x: f"Rp {x:,.0f}" if isinstance(x, (int, float)) and x != 0 else "")
-
-    formatted_df["Pengurangan"] = df["Pengurangan"]
-    formatted_df["Penambahan"] = df["Penambahan"]
-    formatted_df["Naik Turun Golongan"] = df["Naik Turun Golongan"]
-    formatted_df["NET"] = df["NET"]
-
-    kolom_urutan = [
-        "No", "Tanggal Transaksi", "Pelabuhan Asal",
-        "Nominal Tiket Terjual", "Invoice", "Uang Masuk", "Selisih",
-        "Pengurangan", "Penambahan", "Naik Turun Golongan", "NET"
-    ]
-    formatted_df = formatted_df[kolom_urutan]
-
     st.subheader("📄 Tabel Rekapitulasi Rekonsiliasi Per Pelabuhan")
-    df_pelabuhan = formatted_df[formatted_df["Pelabuhan Asal"] != "TOTAL"]
-    df_pelabuhan = df_pelabuhan.drop(columns=["Invoice", "Uang Masuk", "Selisih"])
-    st.dataframe(df_pelabuhan, use_container_width=True)
+    df_pelabuhan = df[df["Pelabuhan Asal"] != "TOTAL"].copy()
+    df_pelabuhan_display = df_pelabuhan.drop(columns=["Invoice", "Uang Masuk", "Selisih"])
+    st.dataframe(df_pelabuhan_display, use_container_width=True)
 
     st.subheader("📄 Tabel Rekapitulasi Total Keseluruhan")
-    df_total = formatted_df[formatted_df["Pelabuhan Asal"] == "TOTAL"].drop(
+    df_total = df[df["Pelabuhan Asal"] == "TOTAL"].drop(
         columns=["Pelabuhan Asal", "No", "Nominal Tiket Terjual", "Pengurangan", "Penambahan", "Naik Turun Golongan", "NET"]
     )
     st.dataframe(df_total, use_container_width=True)
@@ -178,13 +169,6 @@ if uploaded_tiket_files and uploaded_invoice and uploaded_summary and uploaded_r
         file_name="rekapitulasi_rekonsiliasi.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-
-    if all_files:
-        st.markdown("### 📂 Semua file terdeteksi")
-        st.write([file.name for file in all_files])
-
-        st.markdown("### ✅ Tiket terdeteksi")
-        st.write([file.name for file in uploaded_tiket_files])
 
 else:
     st.info("Silakan upload semua file yang dibutuhkan untuk menampilkan tabel hasil rekonsiliasi.")
