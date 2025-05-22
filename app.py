@@ -21,7 +21,7 @@ def to_excel(df):
     return output
 
 st.set_page_config("Rekonsiliasi Tiket", layout="wide")
-st.title("📊 Rekonsiliasi Pendapatan Ticketing")
+st.title("📊 Dashboard Rekonsiliasi Pendapatan Ticketing")
 
 uploaded = st.sidebar.file_uploader("📁 Upload Semua File Excel", type="xlsx", accept_multiple_files=True)
 
