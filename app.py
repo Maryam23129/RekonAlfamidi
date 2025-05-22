@@ -89,28 +89,26 @@ if uploaded_tiket_files and uploaded_invoice and uploaded_summary_files and uplo
     )
     invoice_by_pelabuhan['KEBERANGKATAN'] = invoice_by_pelabuhan['KEBERANGKATAN'].str.lower().str.replace('pelabuhan', '').str.strip()
 
-    match = re.search(r's_d[_\s](\d{4}-\d{2}-\d{2})', uploaded_invoice.name)
+    match_range = re.search(r'(\d{4}-\d{2}-\d{2})\s*s[_\-]d\s*(\d{4}-\d{2}-\d{2})', uploaded_invoice.name)
+    tanggal_transaksi_str = ""
+    if match_range:
+        tanggal_awal_str, tanggal_akhir_str = match_range.groups()
+        tanggal_transaksi_str = f"{pd.to_datetime(tanggal_awal_str).strftime('%d-%m-%Y')} s.d {pd.to_datetime(tanggal_akhir_str).strftime('%d-%m-%Y')}"
+    else:
+        match = re.search(r's_d[_\s](\d{4}-\d{2}-\d{2})', uploaded_invoice.name)
+        if match:
+            tanggal_akhir_str = match.group(1)
+            tanggal_transaksi_str = pd.to_datetime(tanggal_akhir_str).strftime('%d-%m-%Y')
+
     pengurangan_total = ""
-    tanggal_akhir_str = ""
-    if match:
-        tanggal_akhir_str = match.group(1)
+    if 'tanggal_akhir_str' in locals():
         tanggal_akhir = pd.to_datetime(tanggal_akhir_str)
         target_date = tanggal_akhir + pd.Timedelta(days=1)
 
         for summary_file in uploaded_summary_files:
             if target_date.strftime('%Y-%m-%d') in summary_file.name:
                 summary_df = load_excel(summary_file)
-                summary_df["CETAK BOARDING PASS"] = pd.to_datetime(summary_df["CETAK BOARDING PASS"], errors='coerce')
-                summary_df["TARIF"] = pd.to_numeric(summary_df["TARIF"], errors='coerce')
-
-                summary_filtered = summary_df[
-                    (summary_df["CETAK BOARDING PASS"].dt.date == target_date.date()) &
-                    (summary_df["CETAK BOARDING PASS"].dt.time >= pd.to_datetime("00:00:00").time()) &
-                    (summary_df["CETAK BOARDING PASS"].dt.time <= pd.to_datetime("08:00:00").time())
-                ]
-                total_pengurangan = summary_filtered["TARIF"].sum()
-                pengurangan_total = total_pengurangan if total_pengurangan > 0 else ""
-                break
+                summary_df["C]()_
 
     rekening_df = load_excel(uploaded_rekening)
     rekening_detail_df = extract_total_rekening(rekening_df)
@@ -127,7 +125,7 @@ if uploaded_tiket_files and uploaded_invoice and uploaded_summary_files and uplo
 
     df = pd.DataFrame({
         "No": list(range(1, len(pelabuhan_list) + 1)),
-        "Tanggal Transaksi": [tanggal_akhir_str] * len(pelabuhan_list),
+        "Tanggal Transaksi": [tanggal_transaksi_str] * len(pelabuhan_list),
         "Pelabuhan Asal": pelabuhan_list,
         "Nominal Tiket Terjual": [
             next((b['Pendapatan'] for b in b2b_list if b['Pelabuhan'].lower() == pel.lower()), 0)
