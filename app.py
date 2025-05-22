@@ -178,11 +178,26 @@ if uploaded_tiket_files and uploaded_invoice and uploaded_summary_files and uplo
     st.dataframe(df_pelabuhan_display, use_container_width=True)
 
     st.subheader("📄 Tabel Rekonsiliasi Invoice dan Rekening Koran")
-    df_total = df[df["Pelabuhan Asal"] == "TOTAL"].drop(columns=[
-        "Pelabuhan Asal", "No", "Nominal Tiket Terjual", "Pengurangan",
-        "Penambahan", "Naik Turun Golongan", "NaikTurunSelisih"
-    ])
-    st.dataframe(df_total, use_container_width=True)
+    df_total = # Rekap invoice harian dari file invoice
+invoice_df['TANGGAL INVOICE'] = pd.to_datetime(invoice_df['TANGGAL INVOICE'], errors='coerce')
+invoice_df['HARGA'] = pd.to_numeric(invoice_df['HARGA'], errors='coerce')
+rekap_invoice = invoice_df.groupby(invoice_df['TANGGAL INVOICE'].dt.strftime('%d-%m-%Y'))['HARGA'].sum().reset_index()
+rekap_invoice.columns = ['Tanggal Transaksi', 'Total Invoice']
+
+# Rekap rekening remark 0066
+rekening_0066 = rekening_detail_df[rekening_detail_df['Remark'].str.contains("0066", case=False, na=False)].copy()
+rekening_0066['Tanggal Transaksi'] = rekening_0066['Tanggal Transaksi'].dt.strftime('%d-%m-%Y')
+rekap_rekening = rekening_0066.groupby('Tanggal Transaksi')['Credit'].sum().reset_index()
+rekap_rekening.columns = ['Tanggal Transaksi', 'Uang Masuk']
+
+# Gabungkan kedua tabel
+rekap_final = pd.merge(rekap_invoice, rekap_rekening, on='Tanggal Transaksi', how='outer').fillna(0)
+rekap_final['Selisih'] = rekap_final['Total Invoice'] - rekap_final['Uang Masuk']
+
+# Tampilkan hasil akhir
+st.subheader("📄 Tabel Rekonsiliasi Invoice dan Rekening Koran")
+st.dataframe(rekap_final, use_container_width=True)
+
 
     output_excel = to_excel(df)
     st.download_button(
