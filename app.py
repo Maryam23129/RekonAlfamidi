@@ -87,6 +87,7 @@ if uploaded_tiket_files and uploaded_invoice and uploaded_summary_files and uplo
 
     pengurangan_total = ""
     penambahan_dict = {}
+    naik_turun_dict = {}
 
     match_range = re.search(r'(\d{4}-\d{2}-\d{2})\s*s[_\-]d\s*(\d{4}-\d{2}-\d{2})', uploaded_invoice.name)
     tanggal_transaksi_str = ""
@@ -99,21 +100,31 @@ if uploaded_tiket_files and uploaded_invoice and uploaded_summary_files and uplo
             tanggal_akhir_str = match.group(1)
             tanggal_transaksi_str = pd.to_datetime(tanggal_akhir_str).strftime('%d-%m-%Y')
 
-    if 'tanggal_akhir_str' in locals():
-        tanggal_akhir = pd.to_datetime(tanggal_akhir_str)
-        target_date = tanggal_akhir + pd.Timedelta(days=1)
-        for summary_file in uploaded_summary_files:
-            if target_date.strftime('%Y-%m-%d') in summary_file.name:
-                summary_df = load_excel(summary_file)
-                summary_df["CETAK BOARDING PASS"] = pd.to_datetime(summary_df["CETAK BOARDING PASS"], errors='coerce')
-                summary_df["TARIF"] = pd.to_numeric(summary_df["TARIF"], errors='coerce')
-                summary_filtered = summary_df[
-                    (summary_df["CETAK BOARDING PASS"].dt.date == target_date.date()) &
-                    (summary_df["CETAK BOARDING PASS"].dt.time >= pd.to_datetime("00:00:00").time()) &
-                    (summary_df["CETAK BOARDING PASS"].dt.time <= pd.to_datetime("08:00:00").time())
-                ]
-                pengurangan_total = summary_filtered["TARIF"].sum() if not summary_filtered.empty else ""
+    # Proses Naik Turun Golongan dengan mencocokkan invoice dan summary berdasarkan NOMOR INVOICE
+    for summary_file in uploaded_summary_files:
+        if tanggal_awal_str in summary_file.name and tanggal_akhir_str in summary_file.name:
+            summary_df_ntg = load_excel(summary_file)
+            if "NOMOR INVOICE" in summary_df_ntg.columns and "ASAL" in summary_df_ntg.columns:
+                summary_df_ntg["NOMOR INVOICE"] = summary_df_ntg["NOMOR INVOICE"].astype(str)
+                summary_df_ntg["ASAL"] = summary_df_ntg["ASAL"].astype(str).str.lower()
+                invoice_df["NOMOR INVOICE"] = invoice_df["NOMOR INVOICE"].astype(str)
 
+                for pel in ["merak", "bakauheni", "ketapang", "gilimanuk", "ciwandan", "panjang"]:
+                    sum_pel = summary_df_ntg[summary_df_ntg["ASAL"] == pel]
+                    inv_pel = invoice_df[invoice_df["KEBERANGKATAN"].str.lower().str.contains(pel)]
+
+                    ringkasan = []
+                    for noinv in set(sum_pel["NOMOR INVOICE"]).union(set(inv_pel["NOMOR INVOICE"])):
+                        total_sum = sum_pel[sum_pel["NOMOR INVOICE"] == noinv]["TARIF"].sum()
+                        total_inv = inv_pel[inv_pel["NOMOR INVOICE"] == noinv]["HARGA"].sum()
+                        if total_sum != total_inv:
+                            ringkasan.append(f"Inv {noinv}: Summary={int(total_sum)}, Invoice={int(total_inv)}")
+
+                    if ringkasan:
+                        naik_turun_dict[pel] = "; ".join(ringkasan)
+            break
+
+    # Penambahan (tanggal awal jam 00–08)
     if 'tanggal_awal_str' in locals():
         tanggal_awal = pd.to_datetime(tanggal_awal_str)
         for summary_file in uploaded_summary_files:
@@ -151,7 +162,7 @@ if uploaded_tiket_files and uploaded_invoice and uploaded_summary_files and uplo
         "Selisih": selisih_list,
         "Pengurangan": [pengurangan_total if i == 0 and pengurangan_total else "" for i in range(len(pelabuhan_list))],
         "Penambahan": [penambahan_dict.get(pel.lower(), "") for pel in pelabuhan_list],
-        "Naik Turun Golongan": [""] * len(pelabuhan_list),
+        "Naik Turun Golongan": [naik_turun_dict.get(pel.lower(), "") for pel in pelabuhan_list],
         "NET": [""] * len(pelabuhan_list)
     })
 
