@@ -123,7 +123,8 @@ if uploaded_tiket_files and uploaded_invoice and uploaded_summary and uploaded_r
         "Selisih": selisih_list,
         "Pengurangan": ["Belum Diisi"] * len(pelabuhan_list),
         "Penambahan": ["Belum Diisi"] * len(pelabuhan_list),
-        "Naik Turun Golongan": ["Belum Diisi"] * len(pelabuhan_list)
+        "Naik Turun Golongan": ["Belum Diisi"] * len(pelabuhan_list),
+        "NET": [""] * len(pelabuhan_list)
     })
 
     total_row = {
@@ -136,7 +137,8 @@ if uploaded_tiket_files and uploaded_invoice and uploaded_summary and uploaded_r
         "Selisih": df["Invoice"].sum() - df["Uang Masuk"].sum(),
         "Pengurangan": "",
         "Penambahan": "",
-        "Naik Turun Golongan": ""
+        "Naik Turun Golongan": "",
+        "NET": ""
     }
     df = pd.concat([df, pd.DataFrame([total_row])], ignore_index=True)
 
@@ -149,11 +151,12 @@ if uploaded_tiket_files and uploaded_invoice and uploaded_summary and uploaded_r
     formatted_df["Pengurangan"] = df["Pengurangan"]
     formatted_df["Penambahan"] = df["Penambahan"]
     formatted_df["Naik Turun Golongan"] = df["Naik Turun Golongan"]
+    formatted_df["NET"] = df["NET"]
 
     kolom_urutan = [
         "No", "Tanggal Transaksi", "Pelabuhan Asal",
         "Nominal Tiket Terjual", "Invoice", "Uang Masuk", "Selisih",
-        "Pengurangan", "Penambahan", "Naik Turun Golongan"
+        "Pengurangan", "Penambahan", "Naik Turun Golongan", "NET"
     ]
     formatted_df = formatted_df[kolom_urutan]
 
@@ -164,7 +167,7 @@ if uploaded_tiket_files and uploaded_invoice and uploaded_summary and uploaded_r
 
     st.subheader("📄 Tabel Rekapitulasi Total Keseluruhan")
     df_total = formatted_df[formatted_df["Pelabuhan Asal"] == "TOTAL"].drop(
-        columns=["Pelabuhan Asal", "No", "Nominal Tiket Terjual", "Pengurangan", "Penambahan", "Naik Turun Golongan"]
+        columns=["Pelabuhan Asal", "No", "Nominal Tiket Terjual", "Pengurangan", "Penambahan", "Naik Turun Golongan", "NET"]
     )
     st.dataframe(df_total, use_container_width=True)
 
