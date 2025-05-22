@@ -35,21 +35,7 @@ def to_excel(df):
             worksheet.set_column(col_num, col_num, 20, fmt)
         border_format = workbook.add_format({'border': 1})
         worksheet.conditional_format(0, 0, len(df), len(df.columns) - 1, {'type': 'no_blanks', 'format': border_format})
-        worksheet.conditional_format(0, 0, len(df), len(df.columns) - 1, {'type': 'blanks', 'format': border_format})
-    output.seek(0)
-    return output
-
-st.set_page_config(page_title="Dashboard Rekonsiliasi Pendapatan Ticketing", layout="wide")
-
-st.markdown("""
-<h1 style='text-align: center;'>📊 Dashboard Rekonsiliasi Pendapatan Ticketing 🚢💰</h1>
-<p style='text-align: center; font-size: 18px;'>Aplikasi ini digunakan untuk membandingkan data tiket terjual, invoice, ringkasan tiket, dan pemasukan dari rekening koran guna memastikan kesesuaian pendapatan.</p>
-""", unsafe_allow_html=True)
-
-st.sidebar.title("Upload File")
-uploaded_files = st.sidebar.file_uploader("📁 Upload Semua File Sekaligus", type=["xlsx"], accept_multiple_files=True, key="main_upload")
-if st.sidebar.button("➕ Tambah File Lagi"):
-    st.sidebar.file_uploader("📁 Upload Tambahan", type=["xlsx"], accept_multiple_files=True, key="extra_upload")
+        worksheet.conditional_format(0, 0, len(df), len(df.columns) - 1, {'type': 'bl_
 
 uploaded_tiket_files = []
 uploaded_invoice = uploaded_summary = uploaded_rekening = None
@@ -163,7 +149,9 @@ if uploaded_tiket_files and uploaded_invoice and uploaded_summary and uploaded_r
     st.dataframe(df_pelabuhan, use_container_width=True)
 
     st.subheader("📄 Tabel Rekapitulasi Total Keseluruhan")
-    df_total = formatted_df[formatted_df["Pelabuhan Asal"] == "TOTAL"].drop(columns=["Pelabuhan Asal", "No"])
+    df_total = formatted_df[formatted_df["Pelabuhan Asal"] == "TOTAL"].drop(
+        columns=["Pelabuhan Asal", "No", "Nominal Tiket Terjual", "Pengurangan", "Penambahan", "Naik Turun Golongan"]
+    )
     st.dataframe(df_total, use_container_width=True)
 
     output_excel = to_excel(df)
