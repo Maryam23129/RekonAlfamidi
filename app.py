@@ -198,6 +198,7 @@ rekap_final['Selisih'] = rekap_final['Total Invoice'] - rekap_final['Uang Masuk'
 st.subheader("📄 Tabel Rekonsiliasi Invoice dan Rekening Koran")
 st.dataframe(rekap_final, use_container_width=True)
 
+    # Tombol Download Excel
     output_excel = to_excel(df)
     st.download_button(
         label="📥 Download Rekapitulasi",
