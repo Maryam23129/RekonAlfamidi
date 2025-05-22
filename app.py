@@ -100,24 +100,26 @@ if uploaded_tiket_files and uploaded_invoice and uploaded_summary_files and uplo
             tanggal_akhir_str = match.group(1)
             tanggal_transaksi_str = pd.to_datetime(tanggal_akhir_str).strftime('%d-%m-%Y')
 
-    pengurangan_total = ""
-    if 'tanggal_akhir_str' in locals():
-        tanggal_akhir = pd.to_datetime(tanggal_akhir_str)
-        target_date = tanggal_akhir + pd.Timedelta(days=1)
-
+    # Ambil nilai penambahan dari tanggal awal invoice jam 00:00–08:00
+    penambahan_dict = {}
+    if 'tanggal_awal_str' in locals():
+        tanggal_awal = pd.to_datetime(tanggal_awal_str)
         for summary_file in uploaded_summary_files:
-            if target_date.strftime('%Y-%m-%d') in summary_file.name:
-                summary_df = load_excel(summary_file)
-                summary_df["CETAK BOARDING PASS"] = pd.to_datetime(summary_df["CETAK BOARDING PASS"], errors='coerce')
-                summary_df["TARIF"] = pd.to_numeric(summary_df["TARIF"], errors='coerce')
+            if tanggal_awal.strftime('%Y-%m-%d') in summary_file.name:
+                summary_df_pen = load_excel(summary_file)
+                summary_df_pen["CETAK BOARDING PASS"] = pd.to_datetime(summary_df_pen["CETAK BOARDING PASS"], errors='coerce')
+                summary_df_pen["TARIF"] = pd.to_numeric(summary_df_pen["TARIF"], errors='coerce')
+                summary_df_pen["ASAL"] = summary_df_pen["ASAL"].astype(str).str.lower()
 
-                summary_filtered = summary_df[
-                    (summary_df["CETAK BOARDING PASS"].dt.date == target_date.date()) &
-                    (summary_df["CETAK BOARDING PASS"].dt.time >= pd.to_datetime("00:00:00").time()) &
-                    (summary_df["CETAK BOARDING PASS"].dt.time <= pd.to_datetime("08:00:00").time())
+                summary_filtered_pen = summary_df_pen[
+                    (summary_df_pen["CETAK BOARDING PASS"].dt.date == tanggal_awal.date()) &
+                    (summary_df_pen["CETAK BOARDING PASS"].dt.time >= pd.to_datetime("00:00:00").time()) &
+                    (summary_df_pen["CETAK BOARDING PASS"].dt.time <= pd.to_datetime("08:00:00").time())
                 ]
-                total_pengurangan = summary_filtered["TARIF"].sum()
-                pengurangan_total = total_pengurangan if total_pengurangan > 0 else ""
+
+                if not summary_filtered_pen.empty:
+                    grouped = summary_filtered_pen.groupby("ASAL")["TARIF"].sum()
+                    penambahan_dict = grouped.to_dict()
                 break
 
     rekening_df = load_excel(uploaded_rekening)
@@ -148,7 +150,7 @@ if uploaded_tiket_files and uploaded_invoice and uploaded_summary_files and uplo
             pengurangan_total if i == 0 and pengurangan_total else ""
             for i in range(len(pelabuhan_list))
         ],
-        "Penambahan": [""] * len(pelabuhan_list),
+        "Penambahan": [penambahan_dict.get(pel.lower(), "") for pel in pelabuhan_list],
         "Naik Turun Golongan": [""] * len(pelabuhan_list),
         "NET": [""] * len(pelabuhan_list)
     })
