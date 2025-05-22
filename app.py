@@ -65,32 +65,8 @@ if tiket_files and invoice_file and rekening_file and summary_files:
         start_date, end_date = pd.to_datetime(start_str), pd.to_datetime(end_str)
         tanggal_display = f"{start_date:%d-%m-%Y} s.d {end_date:%d-%m-%Y}"
 
-        # Pengurangan
-        h1 = end_date + pd.Timedelta(days=1)
-        for sf in summary_files:
-            if h1.strftime("%Y-%m-%d") in sf.name:
-                df = load_excel(sf)
-                df["CETAK BOARDING PASS"] = pd.to_datetime(df["CETAK BOARDING PASS"], errors="coerce")
-                df["TARIF"] = pd.to_numeric(df["TARIF"], errors="coerce")
-                mask = (df["CETAK BOARDING PASS"].dt.date == h1.date()) & \
-                       (df["CETAK BOARDING PASS"].dt.time <= pd.to_datetime("08:00:00").time())
-                pengurangan_total = df.loc[mask, "TARIF"].sum()
-                break
-
-        # Penambahan
-        for sf in summary_files:
-            if start_date.strftime("%Y-%m-%d") in sf.name:
-                df = load_excel(sf)
-                df["CETAK BOARDING PASS"] = pd.to_datetime(df["CETAK BOARDING PASS"], errors="coerce")
-                df["TARIF"] = pd.to_numeric(df["TARIF"], errors="coerce")
-                df["ASAL"] = df["ASAL"].astype(str).str.lower()
-                mask = (df["CETAK BOARDING PASS"].dt.date == start_date.date()) & \
-                       (df["CETAK BOARDING PASS"].dt.time <= pd.to_datetime("08:00:00").time())
-                penambahan_dict = df[mask].groupby("ASAL")["TARIF"].sum().to_dict()
-                break
-
-        # Naik Turun Golongan
         invoice_df["NOMOR INVOICE"] = invoice_df.get("NOMER INVOICE", invoice_df.get("NOMOR INVOICE", "")).astype(str)
+
         for sf in summary_files:
             if start_str in sf.name:
                 df = load_excel(sf)
@@ -100,7 +76,6 @@ if tiket_files and invoice_file and rekening_file and summary_files:
                     for pel in ["merak", "bakauheni", "ketapang", "gilimanuk", "ciwandan", "panjang"]:
                         sum_pel = df[df["ASAL"] == pel]
                         inv_pel = invoice_df[invoice_df["KEBERANGKATAN"].str.lower().str.contains(pel)]
-
                         ringkasan = []
                         common_invoices = set(sum_pel["NOMOR INVOICE"]).intersection(set(inv_pel["NOMOR INVOICE"]))
                         for noinv in common_invoices:
@@ -111,6 +86,8 @@ if tiket_files and invoice_file and rekening_file and summary_files:
                         if ringkasan:
                             naik_turun_dict[pel] = "; ".join(ringkasan)
                 break
+
+        st.write("🧾 Log Naik Turun Golongan:", naik_turun_dict)
 
     pelabuhans = ["Merak", "Bakauheni", "Ketapang", "Gilimanuk", "Ciwandan", "Panjang"]
     invoice_vals = [invoice_df[invoice_df["KEBERANGKATAN"].str.lower().str.contains(p.lower())]["HARGA"].sum() for p in pelabuhans]
@@ -142,12 +119,19 @@ if tiket_files and invoice_file and rekening_file and summary_files:
     df = pd.concat([df, pd.DataFrame([total])], ignore_index=True)
 
     st.subheader("📄 Rekap Per Pelabuhan")
-    st.dataframe(df[df["Pelabuhan Asal"] != "TOTAL"].drop(columns=["Invoice", "Uang Masuk", "Selisih"]), use_container_width=True)
+    st.dataframe(
+        df[df["Pelabuhan Asal"] != "TOTAL"].drop(columns=["Invoice", "Uang Masuk", "Selisih"]),
+        use_container_width=True
+    )
 
-    st.subheader("📄 Rekap Total")
-    st.dataframe(df[df["Pelabuhan Asal"] == "TOTAL"].drop(columns=[
-        "Pelabuhan Asal", "No", "Nominal Tiket Terjual", "Pengurangan", "Penambahan", "Naik Turun Golongan", "NET"
-    ]), use_container_width=True)
+    st.subheader("📄 Tabel Rekonsiliasi Invoice dan Rekening Koran")
+    st.dataframe(
+        df[df["Pelabuhan Asal"] == "TOTAL"].drop(columns=[
+            "Pelabuhan Asal", "No", "Nominal Tiket Terjual",
+            "Pengurangan", "Penambahan", "Naik Turun Golongan", "NET"
+        ]),
+        use_container_width=True
+    )
 
     st.download_button("📥 Download Excel", to_excel(df), file_name="rekapitulasi.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
