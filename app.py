@@ -27,15 +27,6 @@ def to_excel(df):
     output = BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         df.to_excel(writer, index=False, sheet_name='Rekapitulasi')
-        workbook = writer.book
-        worksheet = writer.sheets['Rekapitulasi']
-        currency_format = workbook.add_format({'num_format': '"Rp" #,##0'})
-        for col_num, column in enumerate(df.columns):
-            fmt = currency_format if column in ['Nominal Tiket Terjual', 'Invoice', 'Uang Masuk', 'Selisih'] else None
-            worksheet.set_column(col_num, col_num, 20, fmt)
-        border_format = workbook.add_format({'border': 1})
-        worksheet.conditional_format(0, 0, len(df), len(df.columns) - 1, {'type': 'no_blanks', 'format': border_format})
-        worksheet.conditional_format(0, 0, len(df), len(df.columns) - 1, {'type': 'blanks', 'format': border_format})
     output.seek(0)
     return output
 
@@ -151,17 +142,32 @@ if uploaded_tiket_files and uploaded_invoice and uploaded_summary_files and uplo
         "Selisih": selisih_list,
         "Pengurangan": [pengurangan_total if i == 0 and pengurangan_total else "" for i in range(len(pelabuhan_list))],
         "Penambahan": [penambahan_dict.get(pel.lower(), "") for pel in pelabuhan_list],
-        "Naik Turun Golongan": [""] * len(pelabuhan_list),
-        "NET": [""] * len(pelabuhan_list)
+        "Naik Turun Golongan": [""] * len(pelabuhan_list)
     })
+
+    # ✅ Perhitungan kolom NET
+    def extract_selisih_ntg(value):
+        if not isinstance(value, str) or not value.strip():
+            return 0
+        selisih_total = 0
+        matches = re.findall(r"S=(\d+),\s*I=(\d+)", value)
+        for s, i in matches:
+            selisih_total += int(i) - int(s)
+        return selisih_total
+
+    df["Pengurangan"] = pd.to_numeric(df["Pengurangan"], errors="coerce").fillna(0)
+    df["Penambahan"] = pd.to_numeric(df["Penambahan"], errors="coerce").fillna(0)
+    df["NaikTurunSelisih"] = df["Naik Turun Golongan"].apply(extract_selisih_ntg)
+    df["NET"] = df["Invoice"] - df["Pengurangan"] + df["Penambahan"] - df["NaikTurunSelisih"]
+    df.loc[df["Pelabuhan Asal"] == "TOTAL", "NET"] = ""
 
     total_row = {
         "No": "", "Tanggal Transaksi": "", "Pelabuhan Asal": "TOTAL",
         "Nominal Tiket Terjual": df["Nominal Tiket Terjual"].sum(),
         "Invoice": df["Invoice"].sum(),
         "Uang Masuk": df["Uang Masuk"].sum(),
-        "Selisih": df["Invoice"].sum() - df["Uang Masuk"].sum(),
-        "Pengurangan": "", "Penambahan": "", "Naik Turun Golongan": "", "NET": ""
+        "Selisih": df["Selisih"].sum(),
+        "Pengurangan": "", "Penambahan": "", "Naik Turun Golongan": "", "NaikTurunSelisih": "", "NET": ""
     }
 
     df = pd.concat([df, pd.DataFrame([total_row])], ignore_index=True)
@@ -171,8 +177,11 @@ if uploaded_tiket_files and uploaded_invoice and uploaded_summary_files and uplo
     df_pelabuhan_display = df_pelabuhan.drop(columns=["Invoice", "Uang Masuk", "Selisih"])
     st.dataframe(df_pelabuhan_display, use_container_width=True)
 
-    st.subheader("📄 Tabel Rekapitulasi Total Keseluruhan")
-    df_total = df[df["Pelabuhan Asal"] == "TOTAL"].drop(columns=["Pelabuhan Asal", "No", "Nominal Tiket Terjual", "Pengurangan", "Penambahan", "Naik Turun Golongan", "NET"])
+    st.subheader("📄 Tabel Rekonsiliasi Invoice dan Rekening Koran")
+    df_total = df[df["Pelabuhan Asal"] == "TOTAL"].drop(columns=[
+        "Pelabuhan Asal", "No", "Nominal Tiket Terjual", "Pengurangan",
+        "Penambahan", "Naik Turun Golongan", "NaikTurunSelisih"
+    ])
     st.dataframe(df_total, use_container_width=True)
 
     output_excel = to_excel(df)
