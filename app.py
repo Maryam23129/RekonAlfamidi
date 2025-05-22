@@ -173,7 +173,7 @@ if uploaded_tiket_files and uploaded_invoice and uploaded_summary_files and uplo
     df_pelabuhan_display = df_pelabuhan.drop(columns=["Invoice", "Uang Masuk", "Selisih"])
     st.dataframe(df_pelabuhan_display, use_container_width=True)
 
-    # Rekonsiliasi harian Invoice vs Rekening (0066)
+    # Rekonsiliasi Invoice vs Rekening Koran per tanggal (inner join)
     invoice_df['TANGGAL INVOICE'] = pd.to_datetime(invoice_df['TANGGAL INVOICE'], errors='coerce')
     invoice_df['HARGA'] = pd.to_numeric(invoice_df['HARGA'], errors='coerce')
     rekap_invoice = invoice_df.groupby(invoice_df['TANGGAL INVOICE'].dt.strftime('%d-%m-%Y'))['HARGA'].sum().reset_index()
@@ -184,13 +184,12 @@ if uploaded_tiket_files and uploaded_invoice and uploaded_summary_files and uplo
     rekap_rekening = rekening_0066.groupby('Tanggal Transaksi')['Credit'].sum().reset_index()
     rekap_rekening.columns = ['Tanggal Transaksi', 'Uang Masuk']
 
-    rekap_final = pd.merge(rekap_invoice, rekap_rekening, on='Tanggal Transaksi', how='outer').fillna(0)
+    rekap_final = pd.merge(rekap_invoice, rekap_rekening, on='Tanggal Transaksi', how='inner')
     rekap_final['Selisih'] = rekap_final['Total Invoice'] - rekap_final['Uang Masuk']
 
     st.subheader("📄 Tabel Rekonsiliasi Invoice dan Rekening Koran")
     st.dataframe(rekap_final, use_container_width=True)
 
-    # Download
     output_excel = to_excel(df)
     st.download_button(
         label="📥 Download Rekapitulasi",
@@ -198,5 +197,6 @@ if uploaded_tiket_files and uploaded_invoice and uploaded_summary_files and uplo
         file_name="rekapitulasi_rekonsiliasi.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
 else:
     st.info("Silakan upload semua file yang dibutuhkan untuk menampilkan tabel hasil rekonsiliasi.")
