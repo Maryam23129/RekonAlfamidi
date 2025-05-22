@@ -158,7 +158,8 @@ if uploaded_tiket_files and uploaded_invoice and uploaded_summary and uploaded_r
     formatted_df = formatted_df[kolom_urutan]
 
     st.subheader("📄 Tabel Rekapitulasi Rekonsiliasi Per Pelabuhan")
-    df_pelabuhan = formatted_df[formatted_df["Pelabuhan Asal"] != "TOTAL"].drop(columns=["Invoice", "Uang Masuk", "Selisih"])
+    df_pelabuhan = formatted_df[formatted_df["Pelabuhan Asal"] != "TOTAL"]
+    df_pelabuhan = df_pelabuhan.drop(columns=["Invoice", "Uang Masuk", "Selisih"])
     st.dataframe(df_pelabuhan, use_container_width=True)
 
     st.subheader("📄 Tabel Rekapitulasi Total Keseluruhan")
