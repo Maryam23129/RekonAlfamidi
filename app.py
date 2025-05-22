@@ -108,7 +108,17 @@ if uploaded_tiket_files and uploaded_invoice and uploaded_summary_files and uplo
         for summary_file in uploaded_summary_files:
             if target_date.strftime('%Y-%m-%d') in summary_file.name:
                 summary_df = load_excel(summary_file)
-                summary_df["C]()_
+                summary_df["CETAK BOARDING PASS"] = pd.to_datetime(summary_df["CETAK BOARDING PASS"], errors='coerce')
+                summary_df["TARIF"] = pd.to_numeric(summary_df["TARIF"], errors='coerce')
+
+                summary_filtered = summary_df[
+                    (summary_df["CETAK BOARDING PASS"].dt.date == target_date.date()) &
+                    (summary_df["CETAK BOARDING PASS"].dt.time >= pd.to_datetime("00:00:00").time()) &
+                    (summary_df["CETAK BOARDING PASS"].dt.time <= pd.to_datetime("08:00:00").time())
+                ]
+                total_pengurangan = summary_filtered["TARIF"].sum()
+                pengurangan_total = total_pengurangan if total_pengurangan > 0 else ""
+                break
 
     rekening_df = load_excel(uploaded_rekening)
     rekening_detail_df = extract_total_rekening(rekening_df)
