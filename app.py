@@ -198,7 +198,7 @@ rekap_final['Selisih'] = rekap_final['Total Invoice'] - rekap_final['Uang Masuk'
 st.subheader("📄 Tabel Rekonsiliasi Invoice dan Rekening Koran")
 st.dataframe(rekap_final, use_container_width=True)
 
-  if uploaded_tiket_files and uploaded_invoice and uploaded_summary_files and uploaded_rekening:
+if uploaded_tiket_files and uploaded_invoice and uploaded_summary_files and uploaded_rekening:
     ...
     st.dataframe(df_pelabuhan_display, use_container_width=True)
 
