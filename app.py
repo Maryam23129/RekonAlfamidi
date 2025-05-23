@@ -33,8 +33,8 @@ def to_excel(df):
 st.set_page_config(page_title="Dashboard Rekonsiliasi Pendapatan Ticketing", layout="wide")
 
 st.markdown("""
-<h1 style='text-align: center;'>📊 Dashboard Rekonsiliasi Pendapatan Ticketing 🚢💰</h1>
-<p style='text-align: center; font-size: 18px;'>Aplikasi ini digunakan untuk membandingkan data tiket terjual, invoice, ringkasan tiket, dan pemasukan dari rekening koran guna memastikan kesesuaian pendapatan.</p>
+<h1 style='text-align: center;'>📊🚢 Dashboard Rekonsiliasi Pendapatan Ticketing </h1>
+<p style='text-align: center; font-size: 18px;'>Aplikasi ini digunakan untuk membandingkan data ticketing dan pemasukan dari rekening koran guna memastikan kesesuaian pendapatan.</p>
 """, unsafe_allow_html=True)
 
 st.sidebar.title("Upload File")
