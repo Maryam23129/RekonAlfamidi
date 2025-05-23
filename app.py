@@ -28,6 +28,36 @@ def to_excel(df_pelabuhan, df_rekap_final):
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         df_pelabuhan.to_excel(writer, index=False, sheet_name='Rekap Per Pelabuhan')
         df_rekap_final.to_excel(writer, index=False, sheet_name='Rekonsiliasi Invoice-Rekening')
+
+        workbook = writer.book
+
+        border_fmt = workbook.add_format({'border': 1})
+        header_fmt = workbook.add_format({'bold': True, 'border': 1, 'align': 'center'})
+
+        # Format sheet Rekap Per Pelabuhan
+        worksheet1 = writer.sheets['Rekap Per Pelabuhan']
+        for col_num, value in enumerate(df_pelabuhan.columns):
+            worksheet1.write(0, col_num, value, header_fmt)
+            width = max(15, min(30, len(value) + 2))
+            worksheet1.set_column(col_num, col_num, width)
+
+        worksheet1.conditional_format(1, 0, len(df_pelabuhan), len(df_pelabuhan.columns) - 1,
+                                      {'type': 'no_blanks', 'format': border_fmt})
+        worksheet1.conditional_format(1, 0, len(df_pelabuhan), len(df_pelabuhan.columns) - 1,
+                                      {'type': 'blanks', 'format': border_fmt})
+
+        # Format sheet Rekonsiliasi Invoice-Rekening
+        worksheet2 = writer.sheets['Rekonsiliasi Invoice-Rekening']
+        for col_num, value in enumerate(df_rekap_final.columns):
+            worksheet2.write(0, col_num, value, header_fmt)
+            width = max(15, min(30, len(value) + 2))
+            worksheet2.set_column(col_num, col_num, width)
+
+        worksheet2.conditional_format(1, 0, len(df_rekap_final), len(df_rekap_final.columns) - 1,
+                                      {'type': 'no_blanks', 'format': border_fmt})
+        worksheet2.conditional_format(1, 0, len(df_rekap_final), len(df_rekap_final.columns) - 1,
+                                      {'type': 'blanks', 'format': border_fmt})
+
     output.seek(0)
     return output
 
@@ -191,13 +221,11 @@ if uploaded_tiket_files and uploaded_invoice and uploaded_summary_files and uplo
     st.subheader("📄 Tabel Rekonsiliasi Invoice dan Rekening Koran")
     st.dataframe(rekap_final, use_container_width=True)
 
-    # Siapkan file excel gabungan
-    df_pelabuhan_export = df_pelabuhan.drop(columns=["Invoice", "Uang Masuk", "Selisih"])
-    output_excel = to_excel(df_pelabuhan_export, rekap_final)
+    output_excel = to_excel(df_pelabuhan_display, rekap_final)
     st.download_button(
-        label="📥 Download Semua Rekapitulasi",
+        label="📥 Download Rekapitulasi",
         data=output_excel,
-        file_name="rekapitulasi_rekonsiliasi_lengkap.xlsx",
+        file_name="rekapitulasi_rekonsiliasi.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
