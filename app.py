@@ -23,18 +23,19 @@ def extract_total_rekening(rekening_df):
     rekening_df['Tanggal Transaksi'] = pd.to_datetime('2025' + rekening_df['Bulan'] + rekening_df['Tanggal'], format='%Y%m%d', errors='coerce')
     return rekening_df
 
-def to_excel(df):
+def to_excel(df_pelabuhan, df_rekap_final):
     output = BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        df.to_excel(writer, index=False, sheet_name='Rekapitulasi')
+        df_pelabuhan.to_excel(writer, index=False, sheet_name='Rekap Per Pelabuhan')
+        df_rekap_final.to_excel(writer, index=False, sheet_name='Rekonsiliasi Invoice-Rekening')
     output.seek(0)
     return output
 
 st.set_page_config(page_title="Dashboard Rekonsiliasi Pendapatan Ticketing", layout="wide")
 
 st.markdown("""
-<h1 style='text-align: center;'>📊🚢 Dashboard Rekonsiliasi Pendapatan Ticketing </h1>
-<p style='text-align: center; font-size: 18px;'>Aplikasi ini digunakan untuk membandingkan data ticketing dan pemasukan dari rekening koran guna memastikan kesesuaian pendapatan.</p>
+<h1 style='text-align: center;'>📊 Dashboard Rekonsiliasi Pendapatan Ticketing 🚢💰</h1>
+<p style='text-align: center; font-size: 18px;'>Aplikasi ini digunakan untuk membandingkan data tiket terjual, invoice, ringkasan tiket, dan pemasukan dari rekening koran guna memastikan kesesuaian pendapatan.</p>
 """, unsafe_allow_html=True)
 
 st.sidebar.title("Upload File")
@@ -190,11 +191,13 @@ if uploaded_tiket_files and uploaded_invoice and uploaded_summary_files and uplo
     st.subheader("📄 Tabel Rekonsiliasi Invoice dan Rekening Koran")
     st.dataframe(rekap_final, use_container_width=True)
 
-    output_excel = to_excel(df)
+    # Siapkan file excel gabungan
+    df_pelabuhan_export = df_pelabuhan.drop(columns=["Invoice", "Uang Masuk", "Selisih"])
+    output_excel = to_excel(df_pelabuhan_export, rekap_final)
     st.download_button(
-        label="📥 Download Rekapitulasi",
+        label="📥 Download Semua Rekapitulasi",
         data=output_excel,
-        file_name="rekapitulasi_rekonsiliasi.xlsx",
+        file_name="rekapitulasi_rekonsiliasi_lengkap.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
